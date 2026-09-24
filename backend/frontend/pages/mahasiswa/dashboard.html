@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Mahasiswa</title>
+    <link rel="stylesheet" href="../../css/reset.css" />
+    <link rel="stylesheet" href="../../css/variables.css" />
+    <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/dashboard.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-mark">SP</div>
+          <div class="brand-text">Sistem Pengontrolan Mahasiswa</div>
+        </div>
+        <div class="user-pill">
+          <span id="userInfo"></span>
+          <button onclick="Utils.logout()" class="btn btn-secondary">
+            Keluar
+          </button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Dashboard Mahasiswa</h1>
+            <div class="subtitle">Ajukan dan pantau izin Anda</div>
+          </div>
+        </div>
+
+        <section class="panel" style="margin-bottom: 28px">
+          <div class="panel-header">
+            <h2 class="panel-title">Pengajuan Izin Baru</h2>
+          </div>
+          <div class="panel-body">
+            <form id="permissionForm">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="startDate">Tanggal Mulai</label>
+                  <input type="date" id="startDate" required />
+                </div>
+                <div class="field">
+                  <label for="endDate">Tanggal Selesai</label>
+                  <input type="date" id="endDate" required />
+                </div>
+                <div class="field">
+                  <label for="dosenPembimbing">Dosen Pembimbing</label>
+                  <select id="dosenPembimbing" required>
+                    <option value="">Pilih dosen pembimbing</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="documentNumber">Nomor Dokumen</label>
+                  <input
+                    type="text"
+                    id="documentNumber"
+                    readonly
+                    value="Otomatis dibuat"
+                  />
+                </div>
+                <div class="field" style="grid-column: 1 / -1">
+                  <label for="reason">Alasan Izin</label>
+                  <textarea
+                    id="reason"
+                    required
+                    placeholder="Jelaskan alasan pengajuan izin..."
+                  ></textarea>
+                </div>
+                <div class="field" style="grid-column: 1 / -1">
+                  <label>Persetujuan Formal</label>
+                  <div class="approval-box">
+                    <label
+                      ><input type="checkbox" id="studentSignature" checked />
+                      Saya menyetujui dan menandatangani surat izin ini.</label
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="action-row">
+                <div></div>
+                <button type="submit" class="btn btn-primary">
+                  Kirim Pengajuan
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Riwayat Perizinan Saya</h2>
+          </div>
+          <div class="panel-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Tanggal</th>
+                    <th>Alasan</th>
+                    <th>Status</th>
+                    <th>Catatan</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="permissionTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script>
+      const user = Utils.getUser();
+      if (!user || user.role !== "mahasiswa") {
+        Utils.logout();
+      } else {
+        document.getElementById("userInfo").textContent =
+          `${user.name} (${user.nim_nip})`;
+      }
+
+      function statusClass(status) {
+        if (status === "DISETUJUI") return "status-approved";
+        if (status === "DITOLAK") return "status-rejected";
+        if (status === "SEDANG_KELUAR") return "status-checkout";
+        if (status === "SELESAI") return "status-finished";
+        return "status-pending";
+      }
+
+      async function loadDosenPembimbing() {
+        try {
+          const res = await fetch(
+            `${CONFIG.API_BASE_URL}/auth/users?role=dosen`,
+            {
+              headers: { Authorization: `Bearer ${Utils.getToken()}` },
+            },
+          );
+          const result = await res.json();
+          const select = document.getElementById("dosenPembimbing");
+          select.innerHTML = '<option value="">Pilih dosen pembimbing</option>';
+
+          if (result.success && Array.isArray(result.data)) {
+            result.data.forEach((dosen) => {
+              const option = document.createElement("option");
+              option.value = dosen.id;
+              option.textContent = `${dosen.name} (${dosen.nim_nip})`;
+              select.appendChild(option);
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function loadPermissions() {
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/permissions`, {
+            headers: { Authorization: `Bearer ${Utils.getToken()}` },
+          });
+          const result = await res.json();
+
+          const tbody = document.getElementById("permissionTableBody");
+          tbody.innerHTML = "";
+
+          if (
+            result.success &&
+            Array.isArray(result.data) &&
+            result.data.length > 0
+          ) {
+            result.data.forEach((item) => {
+              let actionBtn = "-";
+              if (item.status === "DISETUJUI") {
+                actionBtn = `<button class="btn btn-primary" onclick="checkout(${item.id})">Check-Out</button>`;
+              } else if (item.status === "SEDANG_KELUAR") {
+                actionBtn = `<button class="btn btn-secondary" onclick="checkin(${item.id})">Check-In</button>`;
+              }
+
+              const printBtn = ` <button class="btn btn-secondary" onclick="printDocument(${JSON.stringify(item)})">Cetak</button>`;
+
+              tbody.innerHTML += `
+                <tr>
+                  <td>${item.id}</td>
+                  <td>${item.start_date} s/d ${item.end_date}</td>
+                  <td>${item.reason}</td>
+                  <td><span class="status-badge ${statusClass(item.status)}">${item.status}</span></td>
+                  <td>${item.review_notes || "-"}</td>
+                  <td>${actionBtn || "-"}${printBtn}</td>
+                </tr>
+              `;
+            });
+          } else {
+            tbody.innerHTML =
+              '<tr><td colspan="6" class="empty-state">Belum ada riwayat perizinan.</td></tr>';
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      document
+        .getElementById("permissionForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const start_date = document.getElementById("startDate").value;
+          const end_date = document.getElementById("endDate").value;
+          const reason = document.getElementById("reason").value;
+          const dosen_pembimbing_id =
+            document.getElementById("dosenPembimbing").value;
+          const studentSignature =
+            document.getElementById("studentSignature").checked;
+
+          if (!studentSignature) {
+            alert(
+              "Anda harus menandatangani pernyataan persetujuan sebelum mengirim izin.",
+            );
+            return;
+          }
+
+          const res = await fetch(`${CONFIG.API_BASE_URL}/permissions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Utils.getToken()}`,
+            },
+            body: JSON.stringify({
+              start_date,
+              end_date,
+              reason,
+              dosen_pembimbing_id,
+            }),
+          });
+
+          const result = await res.json();
+          alert(result.message);
+          if (res.ok) {
+            document.getElementById("permissionForm").reset();
+            loadPermissions();
+          }
+        });
+
+      function printDocument(item) {
+        const printWindow = window.open("", "_blank");
+        const doc = `
+          <html>
+            <head>
+              <title>Bukti Izin Mahasiswa</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+                h2 { text-align: center; }
+                .meta { margin: 20px 0; }
+                .box { border: 1px solid #ccc; border-radius: 8px; padding: 16px; }
+                .signature { margin-top: 25px; display: flex; justify-content: space-between; }
+              </style>
+            </head>
+            <body>
+              <h2>BUKTI PERIZINAN</h2>
+              <div class="box">
+                <p><strong>ID Perizinan:</strong> ${item.id}</p>
+                <p><strong>Nama Mahasiswa:</strong> ${user.name}</p>
+                <p><strong>NIM:</strong> ${user.nim_nip}</p>
+                <p><strong>Dosen Pembimbing:</strong> ${item.dosen_pembimbing_name || "-"}</p>
+                <p><strong>Tanggal:</strong> ${item.start_date} s/d ${item.end_date}</p>
+                <p><strong>Alasan:</strong> ${item.reason}</p>
+                <p><strong>Status:</strong> ${item.status}</p>
+              </div>
+              <div class="signature">
+                <div>Mahasiswa: ________</div>
+                <div>Dosen: ________</div>
+                <div>Dekan: ________</div>
+              </div>
+            </body>
+          </html>
+        `;
+        printWindow.document.write(doc);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+      }
+
+      async function checkout(id) {
+        const res = await fetch(
+          `${CONFIG.API_BASE_URL}/permissions/${id}/checkout`,
+          {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${Utils.getToken()}` },
+          },
+        );
+        const result = await res.json();
+        alert(result.message);
+        loadPermissions();
+      }
+
+      async function checkin(id) {
+        const res = await fetch(
+          `${CONFIG.API_BASE_URL}/permissions/${id}/checkin`,
+          {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${Utils.getToken()}` },
+          },
+        );
+        const result = await res.json();
+        alert(result.message);
+        loadPermissions();
+      }
+
+      loadDosenPembimbing();
+      loadPermissions();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SP System</title>
+    <link rel="stylesheet" href="./css/reset.css" />
+    <link rel="stylesheet" href="./css/variables.css" />
+    <link rel="stylesheet" href="./css/global.css" />
+    <style>
+      :root {
+        --primary: #2563eb;
+        --primary-strong: #1d4ed8;
+        --bg: #f4f8ff;
+        --ink: #0f172a;
+        --muted: #64748b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(
+          135deg,
+          #eff6ff 0%,
+          #f8fafc 45%,
+          #ecfeff 100%
+        );
+        font-family: "Segoe UI", sans-serif;
+        color: var(--ink);
+      }
+
+      .hero {
+        width: min(1100px, calc(100% - 32px));
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 28px;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+        overflow: hidden;
+      }
+
+      .hero-inner {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+      }
+
+      .hero-copy {
+        padding: 52px 44px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(37, 99, 235, 0.08);
+        color: var(--primary-strong);
+        border: 1px solid rgba(37, 99, 235, 0.1);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 20px 0 12px;
+        font-size: clamp(2.3rem, 4vw, 4rem);
+        line-height: 1.05;
+      }
+
+      .lead {
+        color: var(--muted);
+        font-size: 1.08rem;
+        max-width: 560px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-top: 28px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 14px;
+        padding: 14px 22px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-strong)
+        );
+        color: white;
+        box-shadow: 0 14px 24px rgba(37, 99, 235, 0.25);
+      }
+
+      .btn-secondary {
+        background: #f8fafc;
+        color: var(--ink);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+      }
+
+      .hero-panel {
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        color: white;
+        padding: 46px 32px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .mini-card {
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+
+      .mini-card strong {
+        display: block;
+        font-size: 1.7rem;
+        margin-bottom: 6px;
+      }
+
+      .checklist {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+      }
+
+      .checklist li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        opacity: 0.92;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #60a5fa, #34d399);
+      }
+
+      @media (max-width: 860px) {
+        .hero-inner {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-copy,
+        .hero-panel {
+          padding: 28px 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="hero">
+      <div class="hero-inner">
+        <section class="hero-copy">
+          <div class="eyebrow">Campus control</div>
+          <h1>Kelola izin mahasiswa dengan lebih cepat dan jelas.</h1>
+          <p class="lead">
+            SP System membantu mahasiswa mengajukan izin dan dosen/admin
+            memantau serta meninjau status izin secara terstruktur, aman, dan
+            mudah diakses.
+          </p>
+
+          <div class="actions">
+            <a class="btn btn-primary" href="/pages/auth/login.html"
+              >Masuk Sekarang</a
+            >
+            <a class="btn btn-secondary" href="/pages/auth/register.html"
+              >Buat Akun</a
+            >
+          </div>
+        </section>
+
+        <aside class="hero-panel">
+          <div class="mini-card">
+            <strong>3 Role</strong>
+            <span>Admin, Dosen, Mahasiswa</span>
+          </div>
+          <div class="mini-card">
+            <strong>+24/7</strong>
+            <span>Monitoring status izin realtime</span>
+          </div>
+          <ul class="checklist">
+            <li><span class="dot"></span> Proses pengajuan lebih transparan</li>
+            <li><span class="dot"></span> Review izin berbasis role</li>
+            <li><span class="dot"></span> Check-in / check-out terstruktur</li>
+          </ul>
+        </aside>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Admin</title>
+    <link rel="stylesheet" href="../../css/reset.css" />
+    <link rel="stylesheet" href="../../css/variables.css" />
+    <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/dashboard.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-mark">SP</div>
+          <div class="brand-text">Sistem Pengontrolan Mahasiswa</div>
+        </div>
+        <div class="user-pill">
+          <span id="userInfo"></span>
+          <button onclick="Utils.logout()" class="btn btn-secondary">
+            Keluar
+          </button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Dashboard Admin</h1>
+            <div class="subtitle">Monitoring aktivitas keseluruhan kampus</div>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" id="refreshBtn">Refresh</button>
+            <button class="btn btn-primary" id="exportPdfBtn">
+              Export PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="dashboard-hero">
+          <div>
+            <div class="hero-kicker">Ringkasan operasional</div>
+            <h2>Semua aktivitas mahasiswa dan dosen tertata rapi.</h2>
+          </div>
+          <div class="hero-chip">Update real-time</div>
+        </div>
+
+        <div class="card-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Pengajuan</div>
+            <div class="stat-value" id="totalRequests">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Disetujui</div>
+            <div class="stat-value" id="approvedCount">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Ditolak</div>
+            <div class="stat-value" id="rejectedCount">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Menunggu</div>
+            <div class="stat-value" id="pendingCount">0</div>
+          </div>
+        </div>
+
+        <div class="content-split">
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Semua Data Perizinan</h2>
+            </div>
+            <div class="panel-body">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Mahasiswa</th>
+                      <th>NIM</th>
+                      <th>Tanggal Mulai</th>
+                      <th>Tanggal Selesai</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Aktivitas Terbaru</h2>
+            </div>
+            <div class="panel-body">
+              <div class="activity-list" id="activityList"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script>
+      const user = Utils.getUser();
+      if (!user || user.role !== "admin") {
+        Utils.logout();
+      } else {
+        document.getElementById("userInfo").textContent = user.name;
+      }
+
+      function statusClass(status) {
+        if (status === "DISETUJUI") return "status-approved";
+        if (status === "DITOLAK") return "status-rejected";
+        if (status === "SEDANG_KELUAR") return "status-checkout";
+        if (status === "SELESAI") return "status-finished";
+        return "status-pending";
+      }
+
+      function formatActivityDate(value) {
+        const date = new Date(value);
+        return date.toLocaleString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      async function loadAdminSummary() {
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/permissions`, {
+            headers: { Authorization: `Bearer ${Utils.getToken()}` },
+          });
+          const result = await res.json();
+
+          const tbody = document.getElementById("adminTableBody");
+          tbody.innerHTML = "";
+
+          let total = 0;
+          let approved = 0;
+          let rejected = 0;
+          let pending = 0;
+
+          if (
+            result.success &&
+            Array.isArray(result.data) &&
+            result.data.length > 0
+          ) {
+            result.data.forEach((item) => {
+              total += 1;
+              if (item.status === "DISETUJUI") approved += 1;
+              if (item.status === "DITOLAK") rejected += 1;
+              if (item.status === "MENUNGGU") pending += 1;
+
+              tbody.innerHTML += `
+                <tr>
+                  <td>${item.id}</td>
+                  <td>${item.mahasiswa_name}</td>
+                  <td>${item.nim_nip}</td>
+                  <td>${item.start_date}</td>
+                  <td>${item.end_date}</td>
+                  <td><span class="status-badge ${statusClass(item.status)}">${item.status}</span></td>
+                </tr>
+              `;
+            });
+          } else {
+            tbody.innerHTML =
+              '<tr><td colspan="6" class="empty-state">Belum ada data perizinan.</td></tr>';
+          }
+
+          document.getElementById("totalRequests").textContent = total;
+          document.getElementById("approvedCount").textContent = approved;
+          document.getElementById("rejectedCount").textContent = rejected;
+          document.getElementById("pendingCount").textContent = pending;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function loadActivityLogs() {
+        try {
+          const res = await fetch(
+            `${CONFIG.API_BASE_URL}/permissions/activity-logs?limit=12`,
+            {
+              headers: { Authorization: `Bearer ${Utils.getToken()}` },
+            },
+          );
+          const result = await res.json();
+          const activityList = document.getElementById("activityList");
+
+          if (
+            !result.success ||
+            !Array.isArray(result.data) ||
+            result.data.length === 0
+          ) {
+            activityList.innerHTML = `<div class="empty-activity">Belum ada aktivitas terbaru.</div>`;
+            return;
+          }
+
+          activityList.innerHTML = result.data
+            .map(
+              (item) => `
+                <div class="activity-item">
+                  <div class="activity-dot"></div>
+                  <div class="activity-content">
+                    <div class="activity-top">
+                      <span class="activity-role ${item.user_role}">${item.user_role}</span>
+                      <span class="activity-time">${formatActivityDate(item.created_at)}</span>
+                    </div>
+                    <strong>${item.action}</strong>
+                    <p>${item.details}</p>
+                    <small>${item.user_name} • ${item.email}</small>
+                  </div>
+                </div>
+              `,
+            )
+            .join("");
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      document.getElementById("refreshBtn").addEventListener("click", () => {
+        loadAdminSummary();
+        loadActivityLogs();
+      });
+
+      document.getElementById("exportPdfBtn").addEventListener("click", () => {
+        window.print();
+      });
+
+      loadAdminSummary();
+      loadActivityLogs();
+    </script>
+  </body>
+</html>

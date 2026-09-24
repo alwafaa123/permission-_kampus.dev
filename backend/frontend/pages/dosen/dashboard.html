@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Dosen</title>
+    <link rel="stylesheet" href="../../css/reset.css" />
+    <link rel="stylesheet" href="../../css/variables.css" />
+    <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/dashboard.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-mark">SP</div>
+          <div class="brand-text">Sistem Pengontrolan Mahasiswa</div>
+        </div>
+        <div class="user-pill">
+          <span id="userInfo"></span>
+          <button onclick="Utils.logout()" class="btn btn-secondary">
+            Keluar
+          </button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Dashboard Dosen</h1>
+            <div class="subtitle">Review pengajuan izin mahasiswa</div>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Daftar Pengajuan Mahasiswa</h2>
+          </div>
+          <div class="panel-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Mahasiswa</th>
+                    <th>NIM</th>
+                    <th>Tanggal</th>
+                    <th>Alasan</th>
+                    <th>Status</th>
+                    <th>Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody id="dosenTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script>
+      const user = Utils.getUser();
+      if (!user || (user.role !== "dosen" && user.role !== "admin")) {
+        Utils.logout();
+      } else {
+        document.getElementById("userInfo").textContent = user.name;
+      }
+
+      function statusClass(status) {
+        if (status === "DISETUJUI") return "status-approved";
+        if (status === "DITOLAK") return "status-rejected";
+        if (status === "SEDANG_KELUAR") return "status-checkout";
+        if (status === "SELESAI") return "status-finished";
+        return "status-pending";
+      }
+
+      async function loadAllPermissions() {
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/permissions`, {
+            headers: { Authorization: `Bearer ${Utils.getToken()}` },
+          });
+          const result = await res.json();
+
+          const tbody = document.getElementById("dosenTableBody");
+          tbody.innerHTML = "";
+
+          if (
+            result.success &&
+            Array.isArray(result.data) &&
+            result.data.length > 0
+          ) {
+            result.data.forEach((item) => {
+              let actionContent =
+                '<span class="status-badge status-pending">Sudah Diproses</span>';
+              if (item.status === "MENUNGGU") {
+                actionContent = `
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-success" onclick="reviewPermission(${item.id}, 'DISETUJUI')">Setujui</button>
+                    <button class="btn btn-danger" onclick="reviewPermission(${item.id}, 'DITOLAK')">Tolak</button>
+                  </div>
+                `;
+              }
+
+              const printBtn = ` <button class="btn btn-secondary" onclick="printDocument(${JSON.stringify(item)})">Cetak</button>`;
+
+              tbody.innerHTML += `
+                <tr>
+                  <td>${item.id}</td>
+                  <td>${item.mahasiswa_name}</td>
+                  <td>${item.nim_nip}</td>
+                  <td>${item.start_date} s/d ${item.end_date}</td>
+                  <td>${item.reason}</td>
+                  <td><span class="status-badge ${statusClass(item.status)}">${item.status}</span></td>
+                  <td>${actionContent}${printBtn}</td>
+                </tr>
+              `;
+            });
+          } else {
+            tbody.innerHTML =
+              '<tr><td colspan="7" class="empty-state">Belum ada pengajuan perizinan.</td></tr>';
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      function printDocument(item) {
+        const printWindow = window.open("", "_blank");
+        printWindow.document.write(`
+          <html>
+            <head><title>Bukti Izin</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 32px; }
+                h2 { text-align: center; }
+                .box { border: 1px solid #ccc; border-radius: 10px; padding: 18px; margin-top: 24px; }
+                .signature { margin-top: 30px; display: flex; justify-content: space-between; }
+              </style>
+            </head>
+            <body>
+              <h2>BUKTI PERIZINAN</h2>
+              <div class="box">
+                <p><strong>Nama Mahasiswa:</strong> ${item.mahasiswa_name}</p>
+                <p><strong>NIM:</strong> ${item.nim_nip}</p>
+                <p><strong>Dosen Pembimbing:</strong> ${item.dosen_pembimbing_name || "-"}</p>
+                <p><strong>Tanggal:</strong> ${item.start_date} s/d ${item.end_date}</p>
+                <p><strong>Alasan:</strong> ${item.reason}</p>
+                <p><strong>Status:</strong> ${item.status}</p>
+              </div>
+              <div class="signature">
+                <div>Mahasiswa: ________</div>
+                <div>Dosen: ________</div>
+                <div>Dekan: ________</div>
+              </div>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+      }
+
+      async function reviewPermission(id, status) {
+        const notes = prompt(`Masukkan catatan untuk status [${status}]:`);
+        if (notes === null) return;
+
+        const res = await fetch(
+          `${CONFIG.API_BASE_URL}/permissions/${id}/review`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Utils.getToken()}`,
+            },
+            body: JSON.stringify({ status, review_notes: notes }),
+          },
+        );
+
+        const result = await res.json();
+        alert(result.message);
+        loadAllPermissions();
+      }
+
+      loadAllPermissions();
+    </script>
+  </body>
+</html>

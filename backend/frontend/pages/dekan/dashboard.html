@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Dekan</title>
+    <link rel="stylesheet" href="../../css/reset.css" />
+    <link rel="stylesheet" href="../../css/variables.css" />
+    <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/dashboard.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-mark">SP</div>
+          <div class="brand-text">Sistem Pengontrolan Mahasiswa</div>
+        </div>
+        <div class="user-pill">
+          <span id="userInfo"></span>
+          <button onclick="Utils.logout()" class="btn btn-secondary">
+            Keluar
+          </button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Dashboard Dekan</h1>
+            <div class="subtitle">
+              Persetujuan final dan dokumentasi perizinan
+            </div>
+          </div>
+          <button class="btn btn-primary" id="exportPdfBtn">Export PDF</button>
+        </div>
+
+        <div class="dashboard-hero">
+          <div>
+            <div class="hero-kicker">Approval level 3</div>
+            <h2>Pengajuan izin menunggu persetujuan final dekan.</h2>
+          </div>
+          <div class="hero-chip">Verifikasi formal</div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Daftar Persetujuan Final</h2>
+          </div>
+          <div class="panel-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Mahasiswa</th>
+                    <th>NIM</th>
+                    <th>Dosen Pembimbing</th>
+                    <th>Tanggal</th>
+                    <th>Status</th>
+                    <th>Persetujuan</th>
+                  </tr>
+                </thead>
+                <tbody id="dekanTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script>
+      const user = Utils.getUser();
+      if (!user || user.role !== "dekan") {
+        Utils.logout();
+      } else {
+        document.getElementById("userInfo").textContent = user.name;
+      }
+
+      function statusClass(status) {
+        if (status === "DISETUJUI") return "status-approved";
+        if (status === "DITOLAK") return "status-rejected";
+        if (status === "SEDANG_KELUAR") return "status-checkout";
+        if (status === "SELESAI") return "status-finished";
+        return "status-pending";
+      }
+
+      async function loadAllPermissions() {
+        try {
+          const res = await fetch(`${CONFIG.API_BASE_URL}/permissions`, {
+            headers: { Authorization: `Bearer ${Utils.getToken()}` },
+          });
+          const result = await res.json();
+          const tbody = document.getElementById("dekanTableBody");
+          tbody.innerHTML = "";
+
+          if (
+            result.success &&
+            Array.isArray(result.data) &&
+            result.data.length > 0
+          ) {
+            result.data.forEach((item) => {
+              let actionContent =
+                '<span class="status-badge status-pending">Menunggu Final</span>';
+              if (item.status === "MENUNGGU") {
+                actionContent = `
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-success" onclick="reviewPermission(${item.id}, 'DISETUJUI')">Setujui Akhir</button>
+                    <button class="btn btn-danger" onclick="reviewPermission(${item.id}, 'DITOLAK')">Tolak</button>
+                  </div>
+                `;
+              }
+
+              tbody.innerHTML += `
+                <tr>
+                  <td>${item.id}</td>
+                  <td>${item.mahasiswa_name}</td>
+                  <td>${item.nim_nip}</td>
+                  <td>${item.dosen_pembimbing_name || "-"}</td>
+                  <td>${item.start_date} s/d ${item.end_date}</td>
+                  <td><span class="status-badge ${statusClass(item.status)}">${item.status}</span></td>
+                  <td>${actionContent}</td>
+                </tr>
+              `;
+            });
+          } else {
+            tbody.innerHTML =
+              '<tr><td colspan="7" class="empty-state">Belum ada data untuk persetujuan final.</td></tr>';
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function reviewPermission(id, status) {
+        const notes = prompt(`Catatan persetujuan final [${status}]:`);
+        if (notes === null) return;
+
+        const res = await fetch(
+          `${CONFIG.API_BASE_URL}/permissions/${id}/review`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Utils.getToken()}`,
+            },
+            body: JSON.stringify({ status, review_notes: notes }),
+          },
+        );
+
+        const result = await res.json();
+        alert(result.message);
+        loadAllPermissions();
+      }
+
+      document.getElementById("exportPdfBtn").addEventListener("click", () => {
+        window.print();
+      });
+
+      loadAllPermissions();
+    </script>
+  </body>
+</html>
